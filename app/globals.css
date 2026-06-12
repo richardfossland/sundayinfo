@@ -1,0 +1,499 @@
+/* SundayInfo — design foundation.
+   Sunday Suite brand (gold #EBB84B · ink · paper; Playfair Display + Hanken
+   Grotesk). Two surfaces with very different needs share these tokens:
+   the mobile-first ADMIN (dark suite style) and the DISPLAY (/skjerm), which
+   must read from across a room on cheap TV panels — bigger type, calmer
+   motion (opacity-only transitions), and per-zone themes. */
+
+:root {
+  --gold: #ebb84b;
+  --gold-light: #f6dd97;
+  --gold-deep: #c9982f;
+  --gold-grad: linear-gradient(135deg, #f6dd97 0%, #ebb84b 45%, #d4a23a 100%);
+
+  --ink: #11141b;
+  --ink-2: #181c25;
+  --ink-3: #1e232e;
+  --ink-soft: #272d3a;
+  --ink-line: rgba(255, 255, 255, 0.08);
+  --ink-line-strong: rgba(255, 255, 255, 0.16);
+
+  --paper: #faf7f0;
+  --txt: #f3efe6;
+  --txt-dim: #9aa0ad;
+  --txt-faint: #6b7280;
+
+  --ok: #5ec27a;
+  --warn: #e0894a;
+  --danger: #d2554d;
+
+  /* per-zone accent — overridden by the liturgical theme */
+  --accent: var(--gold);
+
+  --display: var(--font-display), "Playfair Display", Georgia, serif;
+  --body: var(--font-body), "Hanken Grotesk", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --maxw: 760px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --radius: 16px;
+  --radius-sm: 11px;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 24px 60px -28px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body {
+  font-family: var(--body);
+  color: var(--txt);
+  line-height: 1.55;
+  min-height: 100dvh;
+  background: radial-gradient(140% 100% at 50% -20%, #232938 0%, #161b24 45%, var(--ink) 80%);
+}
+a {
+  color: var(--gold);
+  text-decoration: none;
+}
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+/* ════════════════ Admin UI ════════════════ */
+
+.shell {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 20px 16px 96px;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 18px;
+}
+.brand {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--txt);
+}
+.brand em {
+  color: var(--gold);
+  font-style: normal;
+}
+.pagetitle {
+  font-family: var(--display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  margin: 6px 0 4px;
+}
+.lede {
+  color: var(--txt-dim);
+  margin-bottom: 18px;
+}
+
+.card {
+  background: linear-gradient(180deg, var(--ink-3) 0%, var(--ink-2) 100%);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-1);
+}
+.card h2 {
+  font-family: var(--display);
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ink-line);
+}
+.card-row:last-child {
+  border-bottom: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 20px;
+  font-weight: 700;
+  font-size: 1rem;
+  background: var(--gold-grad);
+  color: #2a2008;
+  transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--txt);
+  border: 1px solid var(--ink-line-strong);
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-sm {
+  padding: 7px 13px;
+  font-size: 0.88rem;
+}
+.btn-block {
+  width: 100%;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+.field label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin-bottom: 6px;
+  color: var(--txt-dim);
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--ink-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--txt);
+  padding: 11px 13px;
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: -1px;
+}
+.field textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+.hint {
+  font-size: 0.84rem;
+  color: var(--txt-faint);
+  margin-top: 5px;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.badge-ok {
+  background: rgba(94, 194, 122, 0.15);
+  color: var(--ok);
+}
+.badge-warn {
+  background: rgba(224, 137, 74, 0.15);
+  color: var(--warn);
+}
+.badge-danger {
+  background: rgba(210, 85, 77, 0.15);
+  color: var(--danger);
+}
+.badge-dim {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--txt-dim);
+}
+
+.tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  background: rgba(17, 20, 27, 0.94);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--ink-line);
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  z-index: 50;
+}
+.tabs a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--txt-dim);
+  min-width: 56px;
+}
+.tabs a.active {
+  color: var(--gold);
+}
+.tabs a .ticon {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.error-text {
+  color: var(--danger);
+  font-weight: 600;
+  margin: 8px 0;
+}
+.empty {
+  color: var(--txt-faint);
+  text-align: center;
+  padding: 26px 10px;
+}
+
+/* ════════════════ Display (/skjerm) ════════════════ */
+
+.disp {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: clamp(16px, 2.2vw, 30px); /* everything scales off this */
+  background: radial-gradient(120% 110% at 50% -10%, #252b3a 0%, #161b24 50%, var(--ink) 85%);
+  color: var(--txt);
+}
+
+/* light "paper" theme — bright foyers */
+.disp.theme-light,
+.disp.theme-liturgical {
+  background: radial-gradient(120% 110% at 50% -10%, #ffffff 0%, var(--paper) 60%, #efe9dc 100%);
+  color: #232323;
+}
+.disp.theme-light {
+  --accent: var(--gold-deep);
+}
+/* .theme-liturgical sets --accent inline from the church-year module */
+
+.disp-stage {
+  position: relative;
+  flex: 1;
+}
+.disp-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6vh 7vw;
+  opacity: 0;
+  transition: opacity 0.9s var(--ease); /* opacity only: cheap on TV GPUs */
+  pointer-events: none;
+}
+.disp-slide.on {
+  opacity: 1;
+}
+
+.disp-kicker {
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.7em;
+}
+.disp-title {
+  font-family: var(--display);
+  font-size: 2.6em;
+  font-weight: 800;
+  line-height: 1.12;
+  max-width: 24ch;
+}
+.disp-body {
+  font-size: 1.25em;
+  line-height: 1.5;
+  max-width: 38ch;
+  margin-top: 0.9em;
+  white-space: pre-wrap;
+}
+.disp-ref {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.1em;
+  color: var(--accent);
+  margin-top: 1.1em;
+}
+.disp-img {
+  max-width: 78vw;
+  max-height: 62vh;
+  border-radius: 14px;
+  object-fit: contain;
+}
+.disp-qr {
+  width: 9.5em;
+  height: 9.5em;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.55em;
+  margin-top: 1em;
+}
+
+.disp-count {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 4.6em;
+  line-height: 1.05;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.disp-program {
+  margin-top: 1.1em;
+  text-align: left;
+  font-size: 1.05em;
+  max-width: 30ch;
+  width: 100%;
+}
+.disp-program .prow {
+  display: flex;
+  gap: 1em;
+  padding: 0.34em 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.22);
+}
+.disp-program .prow:last-child {
+  border-bottom: none;
+}
+.disp-program .ptime {
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+}
+.disp-program .psub {
+  display: block;
+  font-size: 0.82em;
+  opacity: 0.65;
+}
+
+.disp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 0.7em 1.6em 0.9em;
+  font-size: 0.95em;
+  opacity: 0.85;
+}
+.disp-footer .fchurch {
+  font-weight: 700;
+}
+.disp-footer .fnext {
+  color: var(--accent);
+  font-weight: 600;
+}
+.disp-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 1.15em;
+}
+.disp-offline {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: var(--warn);
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+
+/* emergency overlay — unmissable, theme-independent */
+.disp-emergency {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8vh 8vw;
+  background: rgba(140, 28, 22, 0.97);
+  color: #fff;
+}
+.disp-emergency .etitle {
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 1.1em;
+  margin-bottom: 0.8em;
+  opacity: 0.9;
+}
+.disp-emergency .ebody {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 2.6em;
+  line-height: 1.15;
+  max-width: 22ch;
+}
+
+/* pairing screen */
+.pairing {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6vh 6vw;
+  background: radial-gradient(120% 110% at 50% -10%, #252b3a 0%, var(--ink) 75%);
+  font-size: clamp(16px, 2.2vw, 30px);
+}
+.pairing h1 {
+  font-family: var(--display);
+  font-size: 1.8em;
+  margin-bottom: 0.4em;
+}
+.pairing .pcode {
+  font-family: var(--mono);
+  font-size: 4.2em;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  margin: 0.25em 0;
+  font-variant-numeric: tabular-nums;
+}
+.pairing .psteps {
+  color: var(--txt-dim);
+  max-width: 36ch;
+  font-size: 0.95em;
+  line-height: 1.6;
+}
+.pairing .psteps b {
+  color: var(--txt);
+}
