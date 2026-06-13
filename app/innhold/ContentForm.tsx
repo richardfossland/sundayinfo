@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 
 import { api, errorText } from "@/lib/client/api";
 import { parseRawText } from "@/lib/compose/parseRawText";
+import type { ComposedSlide } from "@/lib/compose/composeSchema";
 
 type Zone = { id: string; name: string };
 
@@ -43,6 +44,16 @@ function toIso(local: string): string | null {
   return local ? new Date(local).toISOString() : null;
 }
 
+/** ISO instant → a `datetime-local` input value in the browser's local zone. */
+function toLocal(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
 export default function ContentForm({
   churchId,
   initial,
@@ -58,6 +69,11 @@ export default function ContentForm({
   const [zones, setZones] = useState<Zone[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // AI compose state: aiSuggested flips on when the last fill came from the
+  // model, so we can show "foreslått av AI, rediger fritt". aiBusy gates the
+  // button while the server route runs.
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiSuggested, setAiSuggested] = useState(false);
 
   useEffect(() => {
     api
@@ -77,7 +93,11 @@ export default function ContentForm({
 
   function applyPaste(text: string) {
     setPaste(text);
+    setAiSuggested(false);
     if (!text.trim()) return;
+    // Instant, offline heuristic on every keystroke — this is the floor and the
+    // fallback. The AI upgrade is an explicit button so we don't call the model
+    // on every keystroke.
     const parsed = parseRawText(text);
     setDraft((cur) => ({
       ...cur,
@@ -87,6 +107,39 @@ export default function ContentForm({
       reference: parsed.reference ?? cur.reference,
       url: parsed.url ?? cur.url,
     }));
+  }
+
+  async function suggestWithAi() {
+    if (!paste.trim()) return;
+    setAiBusy(true);
+    setError(null);
+    try {
+      const { slide } = await api.post<{ slide: ComposedSlide }>("/api/compose", {
+        churchId,
+        raw: paste,
+      });
+      // The model only suggests — we map it onto the draft and the editor edits
+      // freely. Zone routing is intersected with the zones we actually loaded.
+      const allowed = new Set(zones.map((z) => z.id));
+      const suggestedZones = slide.zoneIds.filter((id) => allowed.has(id));
+      setDraft((cur) => ({
+        ...cur,
+        type: slide.type,
+        title: slide.title || cur.title,
+        bodyText: slide.body || cur.bodyText,
+        reference: slide.reference ?? cur.reference,
+        url: slide.url ?? cur.url,
+        expiresAt: slide.expiresAt ? toLocal(slide.expiresAt) : cur.expiresAt,
+        zoneIds: suggestedZones.length > 0 ? suggestedZones : cur.zoneIds,
+      }));
+      // slide.ai is false when the server fell back to the offline heuristic
+      // (no key / model error) — only claim "AI" when it really was.
+      setAiSuggested(slide.ai);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   async function save() {
@@ -143,6 +196,19 @@ export default function ContentForm({
             <p className="hint">
               Første linje blir tittel. Lenker blir QR-kode. Bibelvers gjenkjennes.
             </p>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={aiBusy || !paste.trim()}
+              onClick={suggestWithAi}
+            >
+              {aiBusy ? "Tenker …" : "✨ Foreslå med AI"}
+            </button>
+            {aiSuggested && (
+              <p className="hint" style={{ marginTop: 8, color: "var(--accent, #c9982f)" }}>
+                Foreslått av AI, rediger fritt. Bibelvers limer du inn selv.
+              </p>
+            )}
           </div>
         </div>
       )}
