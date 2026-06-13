@@ -154,6 +154,7 @@ type Slide =
   | { kind: "program" }
   | { kind: "thanks" }
   | { kind: "schedule" }
+  | { kind: "facilities" }
   | { kind: "placeholder" };
 
 function Display({ token, onRevoked }: { token: string; onRevoked: () => void }) {
@@ -238,11 +239,14 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
     [snapshot, now],
   );
 
+  const hasFacilities = (snapshot?.facilities?.length ?? 0) > 0;
+
   const slides = useMemo<Slide[]>(() => {
     const itemSlides: Slide[] = liveItems.map((item) => ({ kind: "item", item }));
+    const facilitySlide: Slide[] = hasFacilities ? [{ kind: "facilities" }] : [];
     switch (resolution.mode) {
       case "pre_service":
-        return [{ kind: "countdown" }, ...itemSlides];
+        return [{ kind: "countdown" }, ...itemSlides, ...facilitySlide];
       case "in_service":
         return [
           ...(resolution.event && resolution.event.program.length > 0
@@ -251,14 +255,14 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
           ...itemSlides,
         ];
       case "post_service":
-        return [{ kind: "thanks" }, ...itemSlides];
+        return [{ kind: "thanks" }, ...itemSlides, ...facilitySlide];
       default: {
-        const reel: Slide[] = [...itemSlides];
+        const reel: Slide[] = [...itemSlides, ...facilitySlide];
         if ((snapshot?.events.length ?? 0) > 0) reel.push({ kind: "schedule" });
         return reel.length > 0 ? reel : [{ kind: "placeholder" }];
       }
     }
-  }, [resolution, liveItems, snapshot]);
+  }, [resolution, liveItems, snapshot, hasFacilities]);
 
   // Rotation: advance on a per-slide timer. The reel identity (kinds + ids)
   // resets the index only when it actually changes shape.
@@ -423,6 +427,23 @@ function SlideContent({
                   {event.title}
                   <span className="psub">{capitalize(weekdayName(start.getDay()))}</span>
                 </span>
+              </div>
+            ))}
+          </div>
+        </>
+      );
+    }
+    case "facilities": {
+      const rooms = snapshot.facilities ?? [];
+      return (
+        <>
+          <div className="disp-kicker">Denne uka</div>
+          <div className="disp-title">Lokaler i bruk</div>
+          <div className="disp-program">
+            {rooms.map((r) => (
+              <div className="prow" key={r.resourceId}>
+                <span className="ptime">{r.room}</span>
+                <span>{r.status}</span>
               </div>
             ))}
           </div>

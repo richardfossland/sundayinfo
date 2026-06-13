@@ -21,4 +21,15 @@ docker cp supabase/tests/info_logic_test.sql "$NAME:/tmp/info_logic_test.sql" >/
 OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f /tmp/info_logic_test.sql 2>&1)
 echo "$OUT" | grep -E "PASS|FAIL" || true
 echo "$OUT" | grep -q "ALL INFO-LOGIC TESTS PASSED" || { echo "TESTS FAILED"; echo "$OUT" | tail -30; exit 1; }
+
+# Optional SundayBooking sibling: recreate the minimal `booking` slice + the
+# VERBATIM signage view/RPC and assert SundayInfo's consumption contract. The
+# booking schema is a SEPARATE deploy; SundayInfo degrades to nothing when it's
+# absent in prod, but here we prove the feed shape the facilities board reads.
+echo "→ booking signage prelude (optional sibling)"; run supabase/tests/_booking_prelude.sql
+echo "→ booking signage assertions"
+docker cp supabase/tests/booking_signage_test.sql "$NAME:/tmp/booking_signage_test.sql" >/dev/null
+OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f /tmp/booking_signage_test.sql 2>&1)
+echo "$OUT" | grep -E "PASS|FAIL" || true
+echo "$OUT" | grep -q "ALL BOOKING-SIGNAGE TESTS PASSED" || { echo "TESTS FAILED"; echo "$OUT" | tail -30; exit 1; }
 echo "✓ all database checks passed"
