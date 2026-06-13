@@ -10,6 +10,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   pairing_expired: 410,
   pairing_consumed: 410,
   screen_not_paired: 401,
+  screen_not_found: 404,
 };
 
 export function rpcErrorStatus(message: string): { status: number; code: string } {

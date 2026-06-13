@@ -231,4 +231,134 @@ begin
   raise notice 'PASS: screen snapshot resolves zone + carries identity';
 end $$;
 
+-- 11. Heartbeat records "currently showing" + version (cockpit telemetry) ─────
+do $$
+declare
+  v_hb jsonb;
+  v_row info.screen%rowtype;
+begin
+  -- screen tokenhash-1 is paired again (test 10). Report showing + version.
+  v_hb := info.heartbeat('tokenhash-1', 'Mozilla/5.0 (X11; CrOS) Chrome/120',
+                         'Foajé · Kunngjøring: Velkommen', 'ver-abc');
+  select * into v_row from info.screen where device_token_hash = 'tokenhash-1';
+  assert v_row.now_showing = 'Foajé · Kunngjøring: Velkommen', 'now_showing recorded';
+  assert v_row.showing_zone_id = v_row.zone_id, 'showing_zone_id mirrors zone on report';
+  assert v_row.current_version = 'ver-abc', 'current_version recorded';
+  assert v_row.last_user_agent like 'Mozilla/5.0%', 'user agent recorded';
+
+  -- NULL showing must NOT wipe the previous report (older display builds).
+  v_hb := info.heartbeat('tokenhash-1', 'x', null, null);
+  select * into v_row from info.screen where device_token_hash = 'tokenhash-1';
+  assert v_row.now_showing = 'Foajé · Kunngjøring: Velkommen',
+    'null showing keeps previous label';
+  assert v_row.current_version = 'ver-abc', 'null version keeps previous';
+  raise notice 'PASS: heartbeat records currently-showing telemetry';
+end $$;
+
+-- 12. Enqueue command + consume-once on heartbeat ─────────────────────────────
+do $$
+declare
+  c constant uuid := '10000000-0000-0000-0000-000000000001';
+  z2 constant uuid := '20000000-0000-0000-0000-000000000002';
+  v_screen uuid;
+  v_cmd_id uuid;
+  v_hb jsonb;
+begin
+  select id into v_screen from info.screen where device_token_hash = 'tokenhash-1';
+
+  -- refresh-only command
+  v_cmd_id := info.enqueue_screen_command(v_screen, true, null,
+    '00000000-0000-0000-0000-000000000001');
+  assert v_cmd_id is not null, 'command id returned';
+  assert exists (select 1 from info.screen_command where screen_id = v_screen),
+    'command queued';
+
+  v_hb := info.heartbeat('tokenhash-1', 'x', null, null);
+  assert (v_hb->'command'->>'refreshNow')::boolean = true, 'heartbeat carries refresh command';
+  assert v_hb->'command'->>'commandId' = v_cmd_id::text, 'command id matches';
+  assert not exists (select 1 from info.screen_command where screen_id = v_screen),
+    'command consumed (delete-on-read)';
+
+  -- next heartbeat has no pending command
+  v_hb := info.heartbeat('tokenhash-1', 'x', null, null);
+  assert v_hb->'command' = 'null'::jsonb, 'no command after consume';
+  raise notice 'PASS: command enqueue + consume-once on heartbeat';
+end $$;
+
+-- 13. Enqueue is idempotent (one pending command per screen) ──────────────────
+do $$
+declare
+  z2 constant uuid := '20000000-0000-0000-0000-000000000002';
+  v_screen uuid;
+  v_id1 uuid; v_id2 uuid;
+begin
+  select id into v_screen from info.screen where device_token_hash = 'tokenhash-1';
+  v_id1 := info.enqueue_screen_command(v_screen, true, null,
+    '00000000-0000-0000-0000-000000000001');
+  v_id2 := info.enqueue_screen_command(v_screen, false, z2,
+    '00000000-0000-0000-0000-000000000001');
+  assert (select count(*) from info.screen_command where screen_id = v_screen) = 1,
+    'still exactly one pending command after re-issue';
+  assert v_id1 <> v_id2, 're-issue mints a fresh command id';
+  assert (select goto_zone_id from info.screen_command where screen_id = v_screen) = z2,
+    'latest command wins';
+  assert (select refresh_now from info.screen_command where screen_id = v_screen) = false,
+    'latest fields replace earlier ones';
+  -- clean up so it does not leak into later asserts
+  perform info.heartbeat('tokenhash-1', 'x', null, null);
+  raise notice 'PASS: enqueue_screen_command is idempotent per screen';
+end $$;
+
+-- 14. goto-zone command targets only same-church zones ────────────────────────
+do $$
+declare
+  v_screen uuid;
+  v_err text;
+begin
+  select id into v_screen from info.screen where device_token_hash = 'tokenhash-1';
+  begin
+    -- zone of ANOTHER church
+    perform info.enqueue_screen_command(v_screen, false,
+      '20000000-0000-0000-0000-000000000003',
+      '00000000-0000-0000-0000-000000000001');
+    raise exception 'should_have_failed';
+  exception when others then v_err := sqlerrm; end;
+  assert v_err = 'zone_not_found', 'cross-church goto zone rejected';
+  assert not exists (select 1 from info.screen_command where screen_id = v_screen),
+    'rejected command leaves nothing queued';
+  raise notice 'PASS: goto-zone command rejects cross-church zones';
+end $$;
+
+-- 15. Snapshot zone override honours same-church only ─────────────────────────
+do $$
+declare
+  v_snap jsonb;
+begin
+  -- override to the café zone (same church) → preview that zone
+  v_snap := info.get_screen_snapshot('tokenhash-1', '20000000-0000-0000-0000-000000000002');
+  assert v_snap->'zone'->>'name' = 'Kafé', 'override previews same-church zone';
+
+  -- override to another church's zone → ignored, falls back to assigned (Foajé)
+  v_snap := info.get_screen_snapshot('tokenhash-1', '20000000-0000-0000-0000-000000000003');
+  assert v_snap->'zone'->>'name' = 'Foajé', 'cross-church override ignored';
+
+  -- no override → assigned zone
+  v_snap := info.get_screen_snapshot('tokenhash-1');
+  assert v_snap->'zone'->>'name' = 'Foajé', 'no override = assigned zone';
+  raise notice 'PASS: screen snapshot zone override is church-scoped';
+end $$;
+
+-- 16. Enqueue against a non-paired screen fails ───────────────────────────────
+do $$
+declare
+  v_err text;
+begin
+  begin
+    perform info.enqueue_screen_command(gen_random_uuid(), true, null, null);
+    raise exception 'should_have_failed';
+  exception when others then v_err := sqlerrm; end;
+  assert v_err = 'screen_not_found', 'enqueue on unknown screen rejected';
+  raise notice 'PASS: enqueue rejects unknown/unpaired screens';
+end $$;
+
 select 'ALL INFO-LOGIC TESTS PASSED' as result;

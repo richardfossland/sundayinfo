@@ -58,10 +58,20 @@ export type ZoneSnapshot = {
   screenName: string;
 };
 
+/** A remote command the device picks up on its next heartbeat, then acts on
+ * and forgets. Consumed-once server-side (delete-on-read). */
+export type ScreenCommand = {
+  commandId: string;
+  refreshNow: boolean;
+  /** Transient preview override; null = stay on the assigned zone. */
+  gotoZoneId: string | null;
+};
+
 export type HeartbeatResponse = {
   screenId: string;
   zoneId: string | null;
   version: string | null;
+  command: ScreenCommand | null;
   emergency: Emergency | null;
 };
 
