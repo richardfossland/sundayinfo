@@ -11,6 +11,8 @@ export default function SettingsPage() {
   const churchId = membership?.churchId ?? null;
   const isAdmin = membership?.role === "admin";
   const [vipps, setVipps] = useState("");
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const [showFacilities, setShowFacilities] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,8 +20,14 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!churchId) return;
     api
-      .get<{ vippsNumber: string | null }>(`/api/settings?churchId=${churchId}`)
-      .then((d) => setVipps(d.vippsNumber ?? ""))
+      .get<{ vippsNumber: string | null; settings: Record<string, unknown> }>(
+        `/api/settings?churchId=${churchId}`,
+      )
+      .then((d) => {
+        setVipps(d.vippsNumber ?? "");
+        setSettings(d.settings ?? {});
+        setShowFacilities(d.settings?.showFacilities === true);
+      })
       .catch(() => {});
   }, [churchId]);
 
@@ -32,6 +40,7 @@ export default function SettingsPage() {
       await api.put("/api/settings", {
         churchId,
         vippsNumber: vipps.trim() || null,
+        settings: { ...settings, showFacilities },
       });
       setSaved(true);
     } catch (err) {
@@ -61,6 +70,24 @@ export default function SettingsPage() {
             />
             <p className="hint">
               Brukes til ett-trykks «Gi med Vipps»-QR når du lager innhold.
+            </p>
+          </div>
+          <div className="field">
+            <label htmlFor="set-facilities">
+              <input
+                id="set-facilities"
+                type="checkbox"
+                checked={showFacilities}
+                onChange={(e) => setShowFacilities(e.target.checked)}
+                disabled={!isAdmin}
+                style={{ width: "auto", marginRight: 8 }}
+              />
+              Vis «Lokaler i bruk»
+            </label>
+            <p className="hint">
+              Henter romstatus fra SundayBooking (om appen er i bruk) og viser
+              hvilke lokaler som er opptatt nå og når de blir ledige. Vises ikke
+              hvis SundayBooking ikke er satt opp.
             </p>
           </div>
           {error && <p className="error-text">{error}</p>}

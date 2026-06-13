@@ -35,6 +35,16 @@ export type SnapshotEvent = {
 
 export type Emergency = { id: string; body: string; expiresAt: string };
 
+/** One room's live booking status, rendered from the optional SundayBooking
+ * signage feed (`booking.signage_board`). Present only when the church/zone has
+ * opted in AND the booking schema is reachable; absent/[] otherwise. */
+export type FacilitiesRoom = {
+  resourceId: string;
+  room: string;
+  /** e.g. "Bryllup 14:00–18:00 · Ledig 19:00" */
+  status: string;
+};
+
 export type ZoneSnapshot = {
   version: string;
   generatedAt: string;
@@ -54,6 +64,10 @@ export type ZoneSnapshot = {
   items: SnapshotItem[];
   events: SnapshotEvent[];
   emergency: Emergency | null;
+  /** Live facility/room board from the optional SundayBooking feed. Merged in
+   * server-side after the base snapshot, only when opted in (see the snapshot
+   * route). Defaults to [] so the display never has to null-check it. */
+  facilities: FacilitiesRoom[];
   screenId: string;
   screenName: string;
 };
