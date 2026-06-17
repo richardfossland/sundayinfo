@@ -566,6 +566,8 @@ function slideLabel(slide: Slide): string {
       return "Takk for i dag";
     case "schedule":
       return "Ukeprogram";
+    case "facilities":
+      return "Lokaler i bruk";
     case "placeholder":
       return "Velkommen";
     case "item": {
