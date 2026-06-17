@@ -4,15 +4,33 @@ import { useCallback, useEffect, useState } from "react";
 
 import AdminShell from "@/app/components/AdminShell";
 import { api, errorText } from "@/lib/client/api";
-import { lastSeenBadge } from "@/lib/client/lastSeen";
+import {
+  deviceLabel,
+  isOnline,
+  lastSeenAgo,
+  lastSeenBadge,
+} from "@/lib/client/lastSeen";
 import { useChurch } from "@/lib/client/useChurch";
+
+type PendingCommand = {
+  command_id: string;
+  refresh_now: boolean;
+  goto_zone_id: string | null;
+  issued_at: string;
+} | null;
 
 type ScreenRow = {
   id: string;
+  church_id: string;
   name: string;
   zone_id: string | null;
   status: string;
   last_seen_at: string | null;
+  last_user_agent: string | null;
+  now_showing: string | null;
+  showing_zone_id: string | null;
+  current_version: string | null;
+  pending_command: PendingCommand;
 };
 type Zone = { id: string; name: string };
 
@@ -34,11 +52,15 @@ export default function ScreensPage() {
 
   useEffect(() => {
     load().catch(() => {});
+    // Poll on the same ~30 s cadence as the display heartbeat so health and
+    // "currently showing" stay fresh without a websocket.
     const id = setInterval(() => load().catch(() => {}), 30_000);
     return () => clearInterval(id);
   }, [load]);
 
   if (loading || !me || !churchId) return null;
+
+  const onlineCount = screens.filter((s) => isOnline(s.last_seen_at)).length;
 
   return (
     <AdminShell me={me} selectedChurchId={churchId} onSelectChurch={select}>
@@ -51,12 +73,19 @@ export default function ScreensPage() {
       <ClaimCard churchId={churchId} zones={zones} onClaimed={load} />
 
       <div className="card">
-        <h2>Tilkoblede skjermer</h2>
+        <h2>
+          Tilkoblede skjermer{" "}
+          {screens.length > 0 && (
+            <span className={`badge ${onlineCount > 0 ? "badge-ok" : "badge-dim"}`}>
+              {onlineCount}/{screens.length} på lufta
+            </span>
+          )}
+        </h2>
         {screens.length === 0 ? (
           <p className="empty">Ingen skjermer ennå.</p>
         ) : (
           screens.map((s) => (
-            <ScreenRowView key={s.id} screen={s} zones={zones} onChanged={load} />
+            <ScreenCard key={s.id} screen={s} zones={zones} onChanged={load} />
           ))
         )}
       </div>
@@ -110,7 +139,11 @@ function ClaimCard({
   return (
     <div className="card">
       <h2>Koble til ny skjerm</h2>
-      {done && <p style={{ color: "var(--ok)", marginBottom: 8 }}>Skjermen er koblet til! Den starter av seg selv om noen sekunder.</p>}
+      {done && (
+        <p style={{ color: "var(--ok)", marginBottom: 8 }}>
+          Skjermen er koblet til! Den starter av seg selv om noen sekunder.
+        </p>
+      )}
       <form onSubmit={claim}>
         <div className="field">
           <label htmlFor="s-code">Kode fra TV-en</label>
@@ -121,7 +154,11 @@ function ClaimCard({
             placeholder="F.eks. K7M2PX"
             autoCapitalize="characters"
             autoComplete="off"
-            style={{ fontFamily: "var(--mono)", letterSpacing: "0.15em", textTransform: "uppercase" }}
+            style={{
+              fontFamily: "var(--mono)",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+            }}
           />
         </div>
         <div className="field">
@@ -154,7 +191,7 @@ function ClaimCard({
   );
 }
 
-function ScreenRowView({
+function ScreenCard({
   screen,
   zones,
   onChanged,
@@ -163,62 +200,194 @@ function ScreenRowView({
   zones: Zone[];
   onChanged: () => void;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const online = isOnline(screen.last_seen_at);
   const badge = lastSeenBadge(screen.last_seen_at);
   const zoneName = zones.find((z) => z.id === screen.zone_id)?.name ?? "—";
+  const showingZoneName =
+    screen.showing_zone_id && screen.showing_zone_id !== screen.zone_id
+      ? zones.find((z) => z.id === screen.showing_zone_id)?.name
+      : null;
 
-  async function setZone(zoneId: string) {
-    await api.patch(`/api/screens/${screen.id}`, { zoneId });
-    onChanged();
+  async function run(label: string, fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    setFlash(null);
+    try {
+      await fn();
+      setFlash(label);
+      setTimeout(() => setFlash(null), 6_000);
+      onChanged();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const setAssignedZone = (zoneId: string) =>
+    run("Sone endret", () => api.patch(`/api/screens/${screen.id}`, { zoneId }));
+
+  const forceRefresh = () =>
+    run("Oppdatering sendt — skjermen henter nytt innhold ved neste puls.", () =>
+      api.post(`/api/screens/${screen.id}`, { refreshNow: true }),
+    );
+
+  const pushToZone = (zoneId: string) =>
+    run("Sendt til sone — vises som forhåndsvisning på skjermen.", () =>
+      api.post(`/api/screens/${screen.id}`, { gotoZoneId: zoneId, refreshNow: true }),
+    );
+
+  const backToAssigned = () =>
+    run("Tilbake til egen sone.", () =>
+      api.post(`/api/screens/${screen.id}`, { gotoZoneId: null, refreshNow: true }),
+    );
 
   async function rename() {
     const name = prompt("Nytt navn:", screen.name);
     if (!name?.trim()) return;
-    await api.patch(`/api/screens/${screen.id}`, { name: name.trim() });
-    onChanged();
+    await run("Navn endret", () =>
+      api.patch(`/api/screens/${screen.id}`, { name: name.trim() }),
+    );
   }
 
   async function revoke() {
-    if (!confirm(`Koble fra «${screen.name}»? TV-en går tilbake til paringskoden.`)) return;
-    await api.patch(`/api/screens/${screen.id}`, { revoke: true });
-    onChanged();
+    if (!confirm(`Koble fra «${screen.name}»? TV-en går tilbake til paringskoden.`))
+      return;
+    await run("Frakoblet", () => api.patch(`/api/screens/${screen.id}`, { revoke: true }));
   }
 
+  const pending = screen.pending_command;
+
   return (
-    <div className="card-row">
-      <span style={{ flex: 1 }}>
-        <b>{screen.name || "Skjerm"}</b>
-        <span style={{ color: "var(--txt-faint)", marginLeft: 8, fontSize: "0.82rem" }}>
+    <div className="scr">
+      <div className="scr-head">
+        <span className={`scr-dot ${online ? "on" : "off"}`} aria-hidden />
+        <span className="scr-name">{screen.name || "Skjerm"}</span>
+        <span className={`badge ${badge.cls}`}>{badge.label}</span>
+        {pending && (
+          <span className="badge badge-warn" title="Venter på neste puls">
+            kommando sendt
+          </span>
+        )}
+      </div>
+
+      <div className="scr-meta">
+        <span>
+          <span className="k">Sone</span>
           {zoneName}
+          {showingZoneName && (
+            <span style={{ color: "var(--warn)" }}> → viser {showingZoneName}</span>
+          )}
         </span>
-      </span>
-      <span className={`badge ${badge.cls}`}>{badge.label}</span>
-      {zones.length > 1 && (
-        <select
-          value={screen.zone_id ?? ""}
-          onChange={(e) => setZone(e.target.value)}
-          style={{
-            background: "var(--ink)",
-            color: "var(--txt)",
-            border: "1px solid var(--ink-line-strong)",
-            borderRadius: 8,
-            padding: "4px 6px",
-            fontSize: "0.82rem",
-          }}
-        >
-          {zones.map((z) => (
-            <option key={z.id} value={z.id}>
-              {z.name}
-            </option>
-          ))}
-        </select>
-      )}
-      <button className="btn btn-sm btn-ghost" onClick={rename}>
-        ✎
-      </button>
-      <button className="btn btn-sm btn-ghost" onClick={revoke}>
-        ✕
-      </button>
+        <span className="scr-showing">
+          <span className="k">Viser nå</span>
+          {screen.now_showing || (online ? "—" : "ukjent (frakoblet)")}
+        </span>
+        <span>
+          <span className="k">Sist sett</span>
+          {lastSeenAgo(screen.last_seen_at)}
+          <span style={{ color: "var(--txt-faint)" }}>
+            {" · "}
+            {deviceLabel(screen.last_user_agent)}
+          </span>
+        </span>
+      </div>
+
+      <div className="scr-actions">
+        <button className="btn btn-sm" disabled={busy} onClick={forceRefresh}>
+          Oppdater nå
+        </button>
+
+        {zones.length > 1 && (
+          <select
+            value=""
+            disabled={busy}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) pushToZone(v);
+              e.target.value = "";
+            }}
+            aria-label="Send skjerm til sone"
+          >
+            <option value="">Send til sone …</option>
+            {zones
+              .filter((z) => z.id !== screen.zone_id)
+              .map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.name}
+                </option>
+              ))}
+          </select>
+        )}
+
+        {showingZoneName && (
+          <button className="btn btn-sm btn-ghost" disabled={busy} onClick={backToAssigned}>
+            Tilbake til egen sone
+          </button>
+        )}
+
+        <TestButton screen={screen} onRun={run} busy={busy} />
+
+        {zones.length > 1 && (
+          <select
+            value={screen.zone_id ?? ""}
+            disabled={busy}
+            onChange={(e) => setAssignedZone(e.target.value)}
+            aria-label="Fast sone"
+          >
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                Fast: {z.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button className="btn btn-sm btn-ghost" disabled={busy} onClick={rename}>
+          ✎ Navn
+        </button>
+        <button className="btn btn-sm btn-ghost" disabled={busy} onClick={revoke}>
+          ✕ Koble fra
+        </button>
+      </div>
+
+      {flash && <p className="scr-flash">{flash}</p>}
+      {error && <p className="error-text">{error}</p>}
     </div>
+  );
+}
+
+// A targeted test/emergency message. Reuses the emergency API but scopes it to
+// THIS screen's zone so only this screen (and others in its zone) light up.
+function TestButton({
+  screen,
+  onRun,
+  busy,
+}: {
+  screen: ScreenRow;
+  onRun: (label: string, fn: () => Promise<void>) => Promise<void>;
+  busy: boolean;
+}) {
+  async function send() {
+    const text =
+      prompt("Testmelding til denne skjermen:", "Test fra adminpanelet") ?? "";
+    if (!text.trim()) return;
+    await onRun("Testmelding sendt til sonen (synlig i ~5 min).", () =>
+      api.post(`/api/emergency`, {
+        churchId: screen.church_id,
+        zoneId: screen.zone_id,
+        body: text.trim(),
+        minutes: 5,
+      }),
+    );
+  }
+  return (
+    <button className="btn btn-sm btn-ghost" disabled={busy} onClick={send}>
+      Test/melding
+    </button>
   );
 }

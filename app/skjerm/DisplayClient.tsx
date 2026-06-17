@@ -163,11 +163,19 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
   const [online, setOnline] = useState(true);
   const versionRef = useRef<string | null>(null);
   const failuresRef = useRef(0);
+  // Transient zone preview pushed via a remote command (null = assigned zone).
+  // A ref so the heartbeat closure always reads the latest value.
+  const overrideZoneRef = useRef<string | null>(null);
+  // A short label of what's on screen right now, reported on the heartbeat so
+  // the admin cockpit can show it. A ref so it never re-creates `beat`.
+  const showingRef = useRef<string>("");
 
   const fetchSnapshot = useCallback(async () => {
-    const res = await fetch("/api/display/snapshot", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const zoneId = overrideZoneRef.current;
+    const res = await fetch(
+      `/api/display/snapshot${zoneId ? `?zoneId=${encodeURIComponent(zoneId)}` : ""}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     if (res.status === 401) {
       onRevoked();
       return;
@@ -183,7 +191,11 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
     try {
       const res = await fetch("/api/display/heartbeat", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nowShowing: showingRef.current,
+          version: versionRef.current,
+        }),
       });
       if (res.status === 401) {
         onRevoked();
@@ -193,7 +205,24 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
       const data = (await res.json()) as HeartbeatResponse;
       setOnline(true);
       failuresRef.current = 0;
-      if (data.version !== versionRef.current) {
+
+      // Act on a remote command (consumed-once server-side). A zone push and a
+      // refresh both resolve to a snapshot refetch with the current override.
+      let mustRefetch = false;
+      if (data.command) {
+        if (data.command.gotoZoneId !== undefined) {
+          overrideZoneRef.current = data.command.gotoZoneId;
+          mustRefetch = true;
+        }
+        if (data.command.refreshNow) mustRefetch = true;
+      }
+
+      // While previewing an override zone, the heartbeat's version reflects the
+      // ASSIGNED zone, not what's on screen — so don't let it trigger refetches;
+      // only explicit commands move a previewing screen.
+      const versionChanged =
+        overrideZoneRef.current === null && data.version !== versionRef.current;
+      if (mustRefetch || versionChanged) {
         await fetchSnapshot();
       } else if (data.emergency) {
         // same version but a fresh emergency payload — merge it in
@@ -299,6 +328,16 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
     snapshot?.emergency && Date.parse(snapshot.emergency.expiresAt) > now.getTime()
       ? snapshot.emergency
       : null;
+
+  // Report a short, human label of what's on screen so the cockpit can show it.
+  // Updated on every slide/zone change; read by the heartbeat via a ref.
+  useEffect(() => {
+    const zone = overrideZoneRef.current
+      ? `[forhåndsvisning] ${snapshot?.zone?.name ?? ""}`
+      : (snapshot?.zone?.name ?? "");
+    const label = emergency ? "Viktig melding" : slideLabel(current);
+    showingRef.current = [zone, label].filter(Boolean).join(" · ");
+  }, [current, emergency, snapshot]);
 
   const next = resolution.next ?? upcomingOccurrences(snapshot?.events ?? [], now)[0];
 
@@ -514,4 +553,30 @@ function ItemSlide({ item }: { item: SnapshotItem }) {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Short human label of a slide for the admin cockpit's "currently showing". */
+function slideLabel(slide: Slide): string {
+  switch (slide.kind) {
+    case "countdown":
+      return "Nedtelling til gudstjeneste";
+    case "program":
+      return "Program";
+    case "thanks":
+      return "Takk for i dag";
+    case "schedule":
+      return "Ukeprogram";
+    case "placeholder":
+      return "Velkommen";
+    case "item": {
+      const typeNo: Record<string, string> = {
+        announcement: "Kunngjøring",
+        verse: "Ord for dagen",
+        qr: "QR-kode",
+        image: "Bilde",
+      };
+      const kind = typeNo[slide.item.type] ?? "Innhold";
+      return slide.item.title ? `${kind}: ${slide.item.title}` : kind;
+    }
+  }
 }

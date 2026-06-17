@@ -14,8 +14,10 @@ for _ in $(seq 1 30); do docker exec "$NAME" pg_isready -U postgres >/dev/null 2
 run() { docker cp "$1" "$NAME:/tmp/$(basename "$1")" >/dev/null; docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f "/tmp/$(basename "$1")"; }
 
 echo "→ prelude (Supabase/Plan shims)"; run supabase/tests/_prelude.sql
-echo "→ migration (1st apply)"; run supabase/migrations/20260612090000_info_schema.sql
-echo "→ migration (2nd apply — idempotency)"; run supabase/migrations/20260612090000_info_schema.sql
+echo "→ migrations (1st apply)"
+for m in supabase/migrations/*.sql; do echo "  · $(basename "$m")"; run "$m"; done
+echo "→ migrations (2nd apply — idempotency)"
+for m in supabase/migrations/*.sql; do echo "  · $(basename "$m")"; run "$m"; done
 echo "→ logic assertions"
 docker cp supabase/tests/info_logic_test.sql "$NAME:/tmp/info_logic_test.sql" >/dev/null
 OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f /tmp/info_logic_test.sql 2>&1)

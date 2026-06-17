@@ -263,6 +263,75 @@ select {
   line-height: 1.2;
 }
 
+/* ════════════════ Screen cockpit (/skjermer) ════════════════ */
+
+.scr {
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius-sm);
+  padding: 13px 14px;
+  margin-bottom: 10px;
+  background: var(--ink-2);
+}
+.scr-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.scr-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--txt-faint);
+}
+.scr-dot.on {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(94, 194, 122, 0.18);
+}
+.scr-dot.off {
+  background: var(--danger);
+}
+.scr-name {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+.scr-meta {
+  margin-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.84rem;
+  color: var(--txt-dim);
+}
+.scr-meta .k {
+  color: var(--txt-faint);
+  margin-right: 6px;
+}
+.scr-showing {
+  color: var(--txt);
+}
+.scr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 11px;
+}
+.scr-actions select {
+  background: var(--ink);
+  color: var(--txt);
+  border: 1px solid var(--ink-line-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  font-size: 0.88rem;
+}
+.scr-flash {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ok);
+  margin-top: 8px;
+}
+
 .error-text {
   color: var(--danger);
   font-weight: 600;
