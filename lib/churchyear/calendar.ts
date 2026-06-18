@@ -17,7 +17,7 @@ export type ChurchSeason = {
  * `liturgical` display theme. */
 export const COLOR_HEX: Record<LiturgicalColor, string> = {
   fiolett: "#6b4c9a",
-  hvit: "#c9982f", // white feasts use the suite gold as visible accent
+  hvit: "#d4a23a", // white feasts use the suite gold (deep) as visible accent
   groenn: "#3e7a4e",
   roed: "#b33a3a",
 };

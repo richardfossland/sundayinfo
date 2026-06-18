@@ -6,10 +6,11 @@
    motion (opacity-only transitions), and per-zone themes. */
 
 :root {
+  /* Suite brand gold — canonical values from the marketing site. */
   --gold: #ebb84b;
-  --gold-light: #f6dd97;
-  --gold-deep: #c9982f;
-  --gold-grad: linear-gradient(135deg, #f6dd97 0%, #ebb84b 45%, #d4a23a 100%);
+  --gold-light: #f2d58a;
+  --gold-deep: #d4a23a;
+  --gold-grad: linear-gradient(135deg, #f2d58a 0%, #ebb84b 45%, #d4a23a 100%);
 
   --ink: #11141b;
   --ink-2: #181c25;
@@ -48,6 +49,18 @@
   margin: 0;
   padding: 0;
 }
+/* Screen-reader-only — visible to assistive tech, hidden visually. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 html {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -71,7 +84,40 @@ input,
 textarea,
 select {
   font-family: inherit;
-  font-size: 1rem;
+  /* ≥16px stops iOS Safari from auto-zooming the page on focus. */
+  font-size: max(1rem, 16px);
+}
+
+/* Keyboard focus ring (only on keyboard nav, never on mouse click) — a clear,
+   on-brand gold halo for AA-visible focus across every interactive element. */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, transparent);
+  border-radius: 6px;
+}
+.btn:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, transparent);
+}
+/* The field inputs already draw their own gold outline on :focus; keep the
+   ring on :focus-visible consistent and avoid a doubled outline. */
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible {
+  outline: none;
+}
+
+/* Respect users who ask for less motion — kill transitions/animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ════════════════ Admin UI ════════════════ */
@@ -80,6 +126,11 @@ select {
   max-width: var(--maxw);
   margin: 0 auto;
   padding: 20px 16px 96px;
+}
+/* Centered single-column surfaces (login, onboarding, error, 404). Caps width
+   without overflowing narrow phones. */
+.shell-narrow {
+  max-width: min(440px, 100%);
 }
 .topbar {
   display: flex;
@@ -142,11 +193,15 @@ select {
   border: none;
   border-radius: var(--radius-sm);
   padding: 12px 20px;
+  min-height: 44px; /* comfortable touch target (WCAG 2.5.5) */
   font-weight: 700;
   font-size: 1rem;
   background: var(--gold-grad);
   color: #2a2008;
   transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
+}
+.btn:hover {
+  filter: brightness(1.04);
 }
 .btn:active {
   transform: scale(0.97);
@@ -166,6 +221,7 @@ select {
 }
 .btn-sm {
   padding: 7px 13px;
+  min-height: 0; /* compact inline action — opts out of the 44px floor */
   font-size: 0.88rem;
 }
 .btn-block {
@@ -254,6 +310,9 @@ select {
   font-weight: 600;
   color: var(--txt-dim);
   min-width: 56px;
+  min-height: 44px; /* comfortable touch target (WCAG 2.5.5) */
+  justify-content: center;
+  border-radius: 10px;
 }
 .tabs a.active {
   color: var(--gold);
@@ -337,10 +396,95 @@ select {
   font-weight: 600;
   margin: 8px 0;
 }
+/* Small, consistent inline error — for widgets that fetch and can fail
+   without taking down the page (e.g. the dashboard's screen list). */
+.inline-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 2px;
+  padding: 9px 12px;
+  border: 1px solid rgba(210, 85, 77, 0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(210, 85, 77, 0.12);
+  color: #f0a39c;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.inline-error::before {
+  content: "!";
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
 .empty {
   color: var(--txt-faint);
   text-align: center;
   padding: 26px 10px;
+}
+
+/* ════════════════ Loading states ════════════════ */
+
+/* Centered spinner for full-screen route loaders. */
+.loading-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--txt-dim);
+}
+.spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid var(--ink-line-strong);
+  border-top-color: var(--gold);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Shimmer placeholder blocks for the dashboard skeleton. */
+.skel {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    100deg,
+    var(--ink-soft) 30%,
+    rgba(255, 255, 255, 0.07) 50%,
+    var(--ink-soft) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.skel-line {
+  height: 14px;
+  margin: 9px 0;
+}
+.skel-title {
+  height: 22px;
+  width: 45%;
+  margin-bottom: 16px;
+}
+.skel-row {
+  height: 44px;
+  margin-bottom: 10px;
 }
 
 /* ════════════════ Display (/skjerm) ════════════════ */

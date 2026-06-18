@@ -140,7 +140,9 @@ function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
           </p>
         </>
       ) : (
-        <p className="psteps">{error ? "Prøver å nå tjeneren …" : "Henter kode …"}</p>
+        <p className="psteps" role="status" aria-live="polite">
+          {error ? "Prøver å nå tjeneren …" : "Henter kode …"}
+        </p>
       )}
     </div>
   );
@@ -347,7 +349,9 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
         <h1>
           Sunday<span style={{ color: "var(--gold)" }}>Info</span>
         </h1>
-        <p className="psteps">{online ? "Henter innhold …" : "Venter på nett …"}</p>
+        <p className="psteps" role="status" aria-live="polite">
+          {online ? "Henter innhold …" : "Venter på nett …"}
+        </p>
       </div>
     );
   }
@@ -357,25 +361,44 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
       className={`disp theme-${theme}`}
       style={accent ? ({ "--accent": accent } as React.CSSProperties) : undefined}
     >
-      <div className="disp-stage">
-        {slides.map((slide, i) => (
-          <div
-            key={slide.kind === "item" ? slide.item.id : `${slide.kind}-${i}`}
-            className={`disp-slide${i === safeIndex ? " on" : ""}`}
-          >
-            <SlideContent slide={slide} snapshot={snapshot} now={now} resolution={resolution} />
-          </div>
-        ))}
+      <div
+        className="disp-stage"
+        role="region"
+        aria-roledescription="lysbildeframvisning"
+        aria-label={`Infoskjerm${snapshot.church?.name ? ` – ${snapshot.church.name}` : ""}`}
+      >
+        {slides.map((slide, i) => {
+          const isOn = i === safeIndex;
+          return (
+            <div
+              key={slide.kind === "item" ? slide.item.id : `${slide.kind}-${i}`}
+              className={`disp-slide${isOn ? " on" : ""}`}
+              role="group"
+              aria-roledescription="lysbilde"
+              aria-label={slideLabel(slide)}
+              aria-hidden={!isOn}
+            >
+              <SlideContent slide={slide} snapshot={snapshot} now={now} resolution={resolution} />
+            </div>
+          );
+        })}
         {emergency && (
-          <div className="disp-emergency">
+          <div className="disp-emergency" role="alert" aria-label="Viktig melding">
             <div className="etitle">Viktig melding</div>
             <div className="ebody">{emergency.body}</div>
           </div>
         )}
       </div>
-      <div className="disp-footer">
+      <div className="disp-footer" role="contentinfo">
         <span className="fchurch">
-          {!online && <span className="disp-offline" title="Frakoblet" />}
+          {!online && (
+            <span
+              className="disp-offline"
+              role="img"
+              aria-label="Frakoblet"
+              title="Frakoblet"
+            />
+          )}
           {snapshot.church?.name ?? ""}
         </span>
         {next && resolution.mode === "weekly" && (
@@ -384,9 +407,9 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
             {shortTime(next.start.toTimeString())}
           </span>
         )}
-        <span className="disp-clock">
+        <time className="disp-clock" aria-label="Klokken nå">
           {now.toTimeString().slice(0, 5)}
-        </span>
+        </time>
       </div>
     </div>
   );
