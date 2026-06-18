@@ -38,7 +38,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="shell" style={{ maxWidth: 440, paddingTop: "12vh" }}>
+    <div className="shell shell-narrow" style={{ paddingTop: "12vh" }}>
       <h1 className="brand" style={{ fontSize: "2rem", marginBottom: 6 }}>
         Sunday<em>Info</em>
       </h1>

@@ -21,6 +21,7 @@ export default function Dashboard() {
   const { me, loading, membership, select, refresh } = useChurch();
   const churchId = membership?.churchId ?? null;
   const [screens, setScreens] = useState<ScreenRow[]>([]);
+  const [screensError, setScreensError] = useState(false);
 
   const loadScreens = useCallback(async () => {
     if (!churchId) return;
@@ -29,8 +30,11 @@ export default function Dashboard() {
         `/api/screens?churchId=${churchId}`,
       );
       setScreens(data.screens.filter((s) => s.status === "paired"));
+      setScreensError(false);
     } catch {
-      // dashboard widgets degrade silently
+      // Keep the last good list on screen, but surface a small inline notice
+      // instead of degrading silently.
+      setScreensError(true);
     }
   }, [churchId]);
 
@@ -40,7 +44,7 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [loadScreens]);
 
-  if (loading) return null;
+  if (loading) return <DashboardSkeleton />;
 
   if (!me || me.memberships.length === 0) {
     return <Onboarding onCreated={refresh} />;
@@ -54,6 +58,12 @@ export default function Dashboard() {
 
       <div className="card">
         <h2>Skjermer</h2>
+        {screensError && (
+          <p className="inline-error" role="status">
+            Klarte ikke å hente skjermstatus — viser sist kjente. Prøver igjen
+            automatisk.
+          </p>
+        )}
         {screens.length === 0 ? (
           <p className="empty">
             Ingen skjermer ennå — åpne <b>info.sundaysuite.app/skjerm</b> på en TV og{" "}
@@ -86,6 +96,32 @@ export default function Dashboard() {
 
       <SignOutButton />
     </AdminShell>
+  );
+}
+
+/** While the session loads, mirror the dashboard's shape so the page doesn't
+ *  flash empty (was: `if (loading) return null`). */
+function DashboardSkeleton() {
+  return (
+    <div className="shell" aria-busy="true" aria-label="Laster …">
+      <div className="topbar">
+        <span className="brand">
+          Sunday<em>Info</em>
+        </span>
+      </div>
+      <div className="skel skel-title" />
+      <div className="card">
+        <div className="skel skel-line" style={{ width: "40%" }} />
+        <div className="skel skel-row" />
+      </div>
+      <div className="card">
+        <div className="skel skel-line" style={{ width: "30%" }} />
+        <div className="skel skel-row" />
+        <div className="skel skel-row" />
+        <div className="skel skel-row" />
+      </div>
+      <span className="visually-hidden">Laster innholdet ditt …</span>
+    </div>
   );
 }
 
@@ -210,7 +246,7 @@ function Onboarding({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="shell" style={{ maxWidth: 440, paddingTop: "10vh" }}>
+    <div className="shell shell-narrow" style={{ paddingTop: "10vh" }}>
       <h1 className="brand" style={{ fontSize: "2rem", marginBottom: 6 }}>
         Sunday<em>Info</em>
       </h1>

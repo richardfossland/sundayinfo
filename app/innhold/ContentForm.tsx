@@ -205,7 +205,7 @@ export default function ContentForm({
               {aiBusy ? "Tenker …" : "✨ Foreslå med AI"}
             </button>
             {aiSuggested && (
-              <p className="hint" style={{ marginTop: 8, color: "var(--accent, #c9982f)" }}>
+              <p className="hint" style={{ marginTop: 8, color: "var(--accent, #d4a23a)" }}>
                 Foreslått av AI, rediger fritt. Bibelvers limer du inn selv.
               </p>
             )}
