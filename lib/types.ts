@@ -45,6 +45,15 @@ export type FacilitiesRoom = {
   status: string;
 };
 
+/** Today's/next published service order-of-service, pulled from the optional
+ * SundayPlan feed (`public.service_signage_board`). Present only when the
+ * church/zone opted in AND a published service is upcoming; null otherwise. */
+export type ServiceProgram = {
+  title: string;
+  time: string; // "11:00"
+  rows: { label: string; kind: string }[];
+};
+
 export type ZoneSnapshot = {
   version: string;
   generatedAt: string;
@@ -68,6 +77,9 @@ export type ZoneSnapshot = {
    * server-side after the base snapshot, only when opted in (see the snapshot
    * route). Defaults to [] so the display never has to null-check it. */
   facilities: FacilitiesRoom[];
+  /** Today's/next service order-of-service from the optional SundayPlan feed.
+   * Merged server-side only when opted in; null when off/absent/none upcoming. */
+  serviceProgram: ServiceProgram | null;
   screenId: string;
   screenName: string;
 };

@@ -2,8 +2,9 @@ import { fetchFacilities } from "@/lib/server/booking";
 import { bearerTokenHash } from "@/lib/server/device";
 import { fail, ok } from "@/lib/server/http";
 import { rpcFail } from "@/lib/server/rpc";
+import { fetchServiceProgram } from "@/lib/server/serviceplan";
 import { createServiceClient } from "@/lib/supabase/service";
-import type { FacilitiesRoom } from "@/lib/types";
+import type { FacilitiesRoom, ServiceProgram } from "@/lib/types";
 
 // Full display payload for the screen's zone. The device token is a
 // capability for exactly this — nothing else in the API accepts it.
@@ -34,11 +35,21 @@ export async function GET(req: Request) {
     zone?: { settings?: Record<string, unknown> } | null;
   } | null;
   const churchId = snap?.church?.id;
+  const timezone = snap?.church?.timezone ?? "Europe/Oslo";
   if (churchId && facilitiesEnabled(snap?.zone?.settings, snap?.church?.settings)) {
-    facilities = await fetchFacilities(churchId, snap?.church?.timezone ?? "Europe/Oslo");
+    facilities = await fetchFacilities(churchId, timezone);
   }
 
-  return ok({ ...(data as object), facilities });
+  // Optional enrichment: today's/next service order-of-service pulled from the
+  // sibling SundayPlan app (`public.service_signage_board`). Opt-in per zone or
+  // church via a `showServicePlan` flag. Degrades to null when SundayPlan hasn't
+  // exposed the RPC, so the display never breaks.
+  let serviceProgram: ServiceProgram | null = null;
+  if (churchId && servicePlanEnabled(snap?.zone?.settings, snap?.church?.settings)) {
+    serviceProgram = await fetchServiceProgram(churchId, timezone);
+  }
+
+  return ok({ ...(data as object), facilities, serviceProgram });
 }
 
 /** Zone setting wins when present; otherwise fall back to the church default.
@@ -50,4 +61,15 @@ function facilitiesEnabled(
   const zone = zoneSettings?.showFacilities;
   if (typeof zone === "boolean") return zone;
   return churchSettings?.showFacilities === true;
+}
+
+/** Zone setting wins when present; otherwise fall back to the church default.
+ * Truthy `showServicePlan` (boolean true) opts in. */
+function servicePlanEnabled(
+  zoneSettings: Record<string, unknown> | undefined,
+  churchSettings: Record<string, unknown> | undefined,
+): boolean {
+  const zone = zoneSettings?.showServicePlan;
+  if (typeof zone === "boolean") return zone;
+  return churchSettings?.showServicePlan === true;
 }
