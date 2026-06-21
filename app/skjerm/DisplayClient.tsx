@@ -154,6 +154,7 @@ type Slide =
   | { kind: "item"; item: SnapshotItem }
   | { kind: "countdown" }
   | { kind: "program" }
+  | { kind: "serviceplan" }
   | { kind: "thanks" }
   | { kind: "schedule" }
   | { kind: "facilities" }
@@ -271,13 +272,15 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
   );
 
   const hasFacilities = (snapshot?.facilities?.length ?? 0) > 0;
+  const hasServiceProgram = (snapshot?.serviceProgram?.rows.length ?? 0) > 0;
 
   const slides = useMemo<Slide[]>(() => {
     const itemSlides: Slide[] = liveItems.map((item) => ({ kind: "item", item }));
     const facilitySlide: Slide[] = hasFacilities ? [{ kind: "facilities" }] : [];
+    const serviceSlide: Slide[] = hasServiceProgram ? [{ kind: "serviceplan" }] : [];
     switch (resolution.mode) {
       case "pre_service":
-        return [{ kind: "countdown" }, ...itemSlides, ...facilitySlide];
+        return [{ kind: "countdown" }, ...serviceSlide, ...itemSlides, ...facilitySlide];
       case "in_service":
         return [
           ...(resolution.event && resolution.event.program.length > 0
@@ -288,12 +291,12 @@ function Display({ token, onRevoked }: { token: string; onRevoked: () => void })
       case "post_service":
         return [{ kind: "thanks" }, ...itemSlides, ...facilitySlide];
       default: {
-        const reel: Slide[] = [...itemSlides, ...facilitySlide];
+        const reel: Slide[] = [...serviceSlide, ...itemSlides, ...facilitySlide];
         if ((snapshot?.events.length ?? 0) > 0) reel.push({ kind: "schedule" });
         return reel.length > 0 ? reel : [{ kind: "placeholder" }];
       }
     }
-  }, [resolution, liveItems, snapshot, hasFacilities]);
+  }, [resolution, liveItems, snapshot, hasFacilities, hasServiceProgram]);
 
   // Rotation: advance on a per-slide timer. The reel identity (kinds + ids)
   // resets the index only when it actually changes shape.
@@ -460,6 +463,33 @@ function SlideContent({
           </div>
         </>
       );
+    case "serviceplan": {
+      const sp = snapshot.serviceProgram;
+      if (!sp) return null;
+      const kindNo: Record<string, string> = {
+        welcome: "Velkomst",
+        song: "Sang",
+        scripture: "Tekst",
+        sermon: "Preken",
+        announcement: "Info",
+        gap: "Pause",
+      };
+      return (
+        <>
+          <div className="disp-kicker">
+            {sp.title} · kl. {sp.time}
+          </div>
+          <div className="disp-program">
+            {sp.rows.map((row, i) => (
+              <div className="prow" key={i}>
+                <span className="ptime">{kindNo[row.kind] ?? ""}</span>
+                <span>{row.label}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      );
+    }
     case "thanks": {
       const next = resolution.next;
       return (
@@ -585,6 +615,8 @@ function slideLabel(slide: Slide): string {
       return "Nedtelling til gudstjeneste";
     case "program":
       return "Program";
+    case "serviceplan":
+      return "Dagens gudstjeneste";
     case "thanks":
       return "Takk for i dag";
     case "schedule":

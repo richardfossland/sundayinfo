@@ -34,4 +34,13 @@ docker cp supabase/tests/booking_signage_test.sql "$NAME:/tmp/booking_signage_te
 OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f /tmp/booking_signage_test.sql 2>&1)
 echo "$OUT" | grep -E "PASS|FAIL" || true
 echo "$OUT" | grep -q "ALL BOOKING-SIGNAGE TESTS PASSED" || { echo "TESTS FAILED"; echo "$OUT" | tail -30; exit 1; }
+
+# Optional SundayPlan sibling: recreate the minimal `public` service slice + the
+# VERBATIM service_signage_board RPC and assert SundayInfo's consumption contract.
+echo "→ service signage prelude (optional SundayPlan sibling)"; run supabase/tests/_service_prelude.sql
+echo "→ service signage assertions"
+docker cp supabase/tests/service_signage_test.sql "$NAME:/tmp/service_signage_test.sql" >/dev/null
+OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f /tmp/service_signage_test.sql 2>&1)
+echo "$OUT" | grep -E "PASS|FAIL" || true
+echo "$OUT" | grep -q "ALL SERVICE-SIGNAGE TESTS PASSED" || { echo "TESTS FAILED"; echo "$OUT" | tail -30; exit 1; }
 echo "✓ all database checks passed"
