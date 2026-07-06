@@ -55,6 +55,22 @@ export async function POST(req: Request) {
     if (!body?.churchId || !body.type) return fail(400, "missing_fields");
     const membership = await requireMember(user.id, body.churchId);
 
+    // Zone-restricted editors may only create content placed in their own
+    // zones — never orphan/church-wide items (which they could not later edit,
+    // and which would otherwise be a back door around per-zone authorization).
+    const restricted =
+      membership.role !== "admin" && membership.allowedZoneIds !== null;
+    if (restricted) {
+      const requested = body.zoneIds ?? [];
+      const allowed = membership.allowedZoneIds ?? [];
+      if (
+        requested.length === 0 ||
+        !requested.every((z) => allowed.includes(z))
+      ) {
+        return fail(403, "zone_forbidden");
+      }
+    }
+
     if (JSON.stringify(body.payload ?? {}).length > MAX_PAYLOAD_BYTES) {
       return fail(413, "payload_too_large");
     }

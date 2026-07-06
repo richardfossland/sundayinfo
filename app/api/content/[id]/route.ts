@@ -1,4 +1,9 @@
-import { authFail, requireMember, requireUser } from "@/lib/server/auth";
+import {
+  authFail,
+  requireItemZoneAccess,
+  requireMember,
+  requireUser,
+} from "@/lib/server/auth";
 import { broadcast, zoneTopic } from "@/lib/server/broadcast";
 import { fail, ok, readJson } from "@/lib/server/http";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -34,7 +39,9 @@ export async function PATCH(
     const { id } = await params;
     const ctx = await itemContext(id);
     if (!ctx) return fail(404, "item_not_found");
-    await requireMember(user.id, ctx.churchId);
+    const membership = await requireMember(user.id, ctx.churchId);
+    // Zone-restricted editors may only edit items within their own zones.
+    requireItemZoneAccess(membership, ctx.zoneIds);
 
     const body = await readJson<{
       title?: string;
@@ -71,7 +78,9 @@ export async function DELETE(
     const { id } = await params;
     const ctx = await itemContext(id);
     if (!ctx) return fail(404, "item_not_found");
-    await requireMember(user.id, ctx.churchId);
+    const membership = await requireMember(user.id, ctx.churchId);
+    // Zone-restricted editors may only delete items within their own zones.
+    requireItemZoneAccess(membership, ctx.zoneIds);
 
     const db = createServiceClient();
     const { error } = await db.from("content_item").delete().eq("id", id);

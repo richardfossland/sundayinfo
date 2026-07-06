@@ -74,6 +74,26 @@ export function requireZoneAccess(m: Membership, zoneId: string | null): void {
   if (!canTouchZone(m, zoneId)) throw new AuthError(403, "zone_forbidden");
 }
 
+/** A content item lives in a set of zones (via zone_item). A zone-restricted
+ * editor may only touch it when EVERY zone it is placed in is within their
+ * allowed set — editing a shared item changes what unrelated zones display.
+ * Admins and unrestricted editors always pass. An orphan item (placed in no
+ * zone) is church-wide and therefore requires full (unrestricted) access, so a
+ * zone-restricted editor is denied. */
+export function canTouchItem(m: Membership, itemZoneIds: string[]): boolean {
+  if (m.role === "admin" || m.allowedZoneIds === null) return true;
+  const allowed = m.allowedZoneIds;
+  if (itemZoneIds.length === 0) return false;
+  return itemZoneIds.every((z) => allowed.includes(z));
+}
+
+export function requireItemZoneAccess(
+  m: Membership,
+  itemZoneIds: string[],
+): void {
+  if (!canTouchItem(m, itemZoneIds)) throw new AuthError(403, "zone_forbidden");
+}
+
 /** Uniform catch → Response for API routes. */
 export function authFail(err: unknown): Response | null {
   if (err instanceof AuthError) {
