@@ -22,7 +22,12 @@ export function useChannel(topic: string | null, onEvent: Handler) {
     try {
       const supabase = createClient();
       const channel = supabase.channel(topic, {
-        config: { broadcast: { self: false } },
+        // private: Realtime authorizes each subscriber against the
+        // realtime.messages RLS policy (migration 20260708120000). anon may
+        // RECEIVE on info:zone:*/info:church:* but cannot .send() — closing
+        // the display-spoof hole where anyone who learned a zone/church id
+        // could broadcast a forged event straight to every screen.
+        config: { broadcast: { self: false }, private: true },
       });
 
       channel.on("broadcast", { event: "*" }, (msg) => {
