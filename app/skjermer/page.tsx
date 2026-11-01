@@ -10,6 +10,7 @@ import {
   lastSeenAgo,
   lastSeenBadge,
 } from "@/lib/client/lastSeen";
+import { StorskjermButton } from "@/lib/client/storskjerm/StorskjermButton";
 import { useChurch } from "@/lib/client/useChurch";
 
 type PendingCommand = {
@@ -68,6 +69,9 @@ export default function ScreensPage() {
       <p className="lede">
         Åpne <b>info.sundaysuite.app/skjerm</b> på TV-en — den viser en kode du
         taster inn her.
+      </p>
+      <p>
+        <StorskjermButton path="/skjerm" />
       </p>
 
       <ClaimCard churchId={churchId} zones={zones} onClaimed={load} />

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { SkjermVisning } from "@/lib/client/storskjerm/SkjermVisning";
 import { useChannel } from "@/lib/client/useChannel";
 import { liturgicalAccent } from "@/lib/churchyear/calendar";
 import {
@@ -50,15 +51,21 @@ export default function DisplayClient() {
   }, []);
 
   if (token === undefined) return null;
-  if (token === null) return <Pairing onPaired={setToken} />;
   return (
-    <Display
-      token={token}
-      onRevoked={() => {
-        clearToken();
-        setToken(null);
-      }}
-    />
+    <>
+      <SkjermVisning />
+      {token === null ? (
+        <Pairing onPaired={setToken} />
+      ) : (
+        <Display
+          token={token}
+          onRevoked={() => {
+            clearToken();
+            setToken(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 
